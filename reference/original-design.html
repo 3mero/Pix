@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>أداة تحويل روابط Pixeldrain</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #121212;
+      color: #ffffff;
+      padding: 20px;
+      margin: 0;
+    }
+
+    h1 {
+      text-align: center;
+      color: #00bcd4;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background-color: #1e1e1e;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px #00bcd4;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 15px;
+    }
+
+    button {
+      flex: 1;
+      padding: 10px;
+      background-color: #00bcd4;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background-color: #0097a7;
+    }
+
+    .result, .history {
+      margin-top: 20px;
+    }
+
+    .file-info {
+      background-color: #2c2c2c;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      position: relative;
+    }
+
+    .file-info p {
+      margin: 5px 0;
+      font-size: 15px;
+    }
+
+    .file-info a {
+      color: #4caf50;
+      text-decoration: underline;
+      word-break: break-word;
+    }
+
+    .file-info .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .file-info .actions button {
+      flex: 1;
+      padding: 8px;
+      font-size: 14px;
+      background-color: #3b3b3b;
+    }
+
+    .delete-btn {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      background-color: #f44336;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .show-more {
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    .clear-history {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    .clear-history button {
+      background-color: #d32f2f;
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      font-size: 16px;
+      color: white;
+      cursor: pointer;
+    }
+
+    @media (max-width: 600px) {
+      .buttons {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>محول روابط Pixeldrain</h1>
+  <div class="container">
+    <input type="text" id="linkInput" placeholder="أدخل رابط Pixeldrain هنا...">
+    <div class="buttons">
+      <button onclick="pasteLink()">📋 لصق</button>
+      <button onclick="convertLink()">🔁 تحويل</button>
+    </div>
+
+    <div class="result" id="result"></div>
+
+    <div class="history" id="history">
+      <h2>📁 السجل:</h2>
+      <div id="historyList"></div>
+      <div class="show-more" id="showMoreContainer">
+        <button onclick="showMore()">عرض المزيد ⬇️</button>
+      </div>
+      <div class="clear-history">
+        <button onclick="clearAll()">🗑️ حذف كل السجل</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const input = document.getElementById('linkInput');
+    const result = document.getElementById('result');
+    const historyList = document.getElementById('historyList');
+    const showMoreContainer = document.getElementById('showMoreContainer');
+
+    let visibleCount = 5;
+
+    function pasteLink() {
+      navigator.clipboard.readText().then(text => {
+        input.value = text;
+      }).catch(() => {
+        alert("لم يتم السماح بالوصول إلى الحافظة.");
+      });
+    }
+
+    function convertLink() {
+      const url = input.value.trim();
+      const match = url.match(/pixeldrain\.com\/u\/([a-zA-Z0-9]+)/);
+
+      if (!match) {
+        alert("الرجاء إدخال رابط صالح من موقع Pixeldrain.");
+        return;
+      }
+
+      const fileId = match[1];
+      const downloadUrl = `https://pixeldrain.com/api/file/${fileId}?download`;
+      const infoUrl = `https://pixeldrain.com/api/file/${fileId}/info`;
+
+      fetch(infoUrl)
+        .then(res => res.json())
+        .then(data => {
+          const info = `
+            <div class="file-info">
+              <button class="delete-btn" onclick="deleteSingle('${fileId}')">❌ حذف</button>
+              <p><strong>اسم الملف:</strong> ${data.name || 'غير معروف'}</p>
+              <p><strong>الحجم:</strong> ${(data.size / (1024 * 1024)).toFixed(2)} MB</p>
+              <p><strong>النوع:</strong> ${data.mime_type || 'غير معروف'}</p>
+              <p><strong>عدد التنزيلات:</strong> ${data.downloads}</p>
+              <p><strong>تاريخ الرفع:</strong> ${new Date(data.upload_date).toLocaleString('ar-EG')}</p>
+              <p><strong>رابط التحميل:</strong> <a href="${downloadUrl}" target="_blank">${downloadUrl}</a></p>
+              <div class="actions">
+                <button onclick="window.open('${downloadUrl}', '_blank')">⬇️ تنزيل</button>
+                <button onclick="copyToClipboard('${downloadUrl}')">📋 نسخ الرابط</button>
+              </div>
+            </div>
+          `;
+          result.innerHTML = info;
+          saveToHistory(fileId, data.name, downloadUrl, data.upload_date);
+        })
+        .catch(() => {
+          alert("تعذر جلب معلومات الملف.");
+        });
+    }
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert("تم نسخ الرابط!");
+      });
+    }
+
+    function saveToHistory(id, name, link, date) {
+      const item = {
+        id: id,
+        name: name,
+        link: link,
+        date: new Date(date).toLocaleString('ar-EG')
+      };
+      let history = JSON.parse(localStorage.getItem('pixeldrainHistory')) || [];
+      history = history.filter(h => h.id !== id); // إزالة المكرر
+      history.unshift(item);
+      history = history.slice(0, 30); // حد أقصى 30
+      localStorage.setItem('pixeldrainHistory', JSON.stringify(history));
+      renderHistory();
+    }
+
+    function renderHistory() {
+      let history = JSON.parse(localStorage.getItem('pixeldrainHistory')) || [];
+      historyList.innerHTML = '';
+      const limited = history.slice(0, visibleCount);
+      limited.forEach(item => {
+        historyList.innerHTML += `
+          <div class="file-info">
+            <button class="delete-btn" onclick="deleteSingle('${item.id}')">❌ حذف</button>
+            <p><strong>📄 ${item.name}</strong></p>
+            <p>📅 ${item.date}</p>
+            <p><a href="${item.link}" target="_blank">🔗 رابط التحميل</a></p>
+            <div class="actions">
+              <button onclick="window.open('${item.link}', '_blank')">⬇️ تنزيل</button>
+              <button onclick="copyToClipboard('${item.link}')">📋 نسخ الرابط</button>
+            </div>
+          </div>
+        `;
+      });
+
+      showMoreContainer.style.display = history.length > visibleCount ? 'block' : 'none';
+    }
+
+    function showMore() {
+      visibleCount += 5;
+      renderHistory();
+    }
+
+    function deleteSingle(id) {
+      let history = JSON.parse(localStorage.getItem('pixeldrainHistory')) || [];
+      history = history.filter(item => item.id !== id);
+      localStorage.setItem('pixeldrainHistory', JSON.stringify(history));
+      renderHistory();
+    }
+
+    function clearAll() {
+      if (confirm("هل أنت متأكد من حذف كل السجل؟")) {
+        localStorage.removeItem('pixeldrainHistory');
+        renderHistory();
+      }
+    }
+
+    renderHistory(); // عند تحميل الصفحة
+  </script>
+
+</body>
+</html>
